@@ -1,0 +1,150 @@
+Private Const St1Name = "下拉菜单源"
+Private Const Rng1Address = "B6:B25"
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+'多级下拉菜单触发宏
+'编制人：王备（千顷云）
+'本代码免费提供学习使用，但请勿用于商业售卖和课程使用。
+'网站转载请注明来源。
+
+'当改变目标单元格数量大于1时不触发
+'当单元格被删除时不触发
+On Error Resume Next
+If Target.Count > 1 Then Exit Sub
+If Err.Number <> 0 Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
+End If
+
+'定义常用变量
+Dim St1 As Object, Col As Integer, Rng1 As Object, RngX As Object, Rng2 As Object
+Set St1 = Sheets(St1Name)
+Col = St1.[a1].End(xlToRight).Column
+Set Rng1 = Range(Rng1Address)
+
+'范围外单元格不触发
+If Target.Row > Rng1(Rng1.Count).Row Or Target.Row < Rng1(1).Row Then Exit Sub
+If Target.Column < Rng1.Column Or Target.Column > Rng1.Column + Col - 2 Then Exit Sub
+
+Application.EnableEvents = False
+'清空右边内容
+Set Rng2 = Range(Cells(Target.Row, Target.Column + 1), Cells(Target.Row, Rng1.Column + Col - 1))
+Rng2.Value = ""
+Rng2.Validation.Delete
+
+'新增右边单元格下拉菜单
+Set Cel = Target.Offset(0, 1)
+Cel.Validation.Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:= _
+xlBetween, Formula1:=Str1(Cel)
+If Target.Value <> "" Then Cel.Select
+
+Application.EnableEvents = True
+End Sub
+
+
+
+Sub A_新建下拉菜单表()
+'使用选中目标表格的命令，看是否产生错误值来判断工作表是否已经存在
+'如果选择表格命令出现错误，表示不存在该表，就新建一个
+On Error Resume Next
+Sheets(St1Name).Select
+If Err.Number <> 0 Then
+    Sheets.Add
+    ActiveSheet.Name = St1Name
+End If
+Sheets(St1Name).Cells(1, 1).Select
+Err.Clear
+On Error GoTo 0
+End Sub
+
+Sub B_下拉菜单表删除重复项()
+'定义常用变量
+Dim St1 As Object, Col As Integer, arr()
+Set St1 = Sheets(St1Name)
+Col = St1.[a1].End(xlToRight).Column
+
+ReDim arr(0 To Col - 1)
+For i = 0 To Col - 1
+    arr(i) = i + 1
+Next
+'利用Excel自带的删除重复项功能
+St1.Cells.RemoveDuplicates Columns:=(arr), Header:=xlYes
+End Sub
+
+Sub C_初始化下拉列表区域()
+
+'定义常用变量
+Dim St1 As Object, Col As Integer, Rng1 As Object, RngX As Object
+Set St1 = Sheets(St1Name)
+Col = St1.[a1].End(xlToRight).Column
+Set Rng1 = Range(Rng1Address)
+Set RngX = Rng1.Resize(Rng1.Rows.Count, Col)
+
+Application.EnableEvents = False
+RngX.Value = ""
+
+Rng1.Validation.Delete
+Rng1.Validation.Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:= _
+    xlBetween, Formula1:=Str1(Rng1(1))
+
+With RngX.Interior
+    .Pattern = xlSolid
+    .PatternColorIndex = xlAutomatic
+    .ThemeColor = xlThemeColorAccent6
+    .TintAndShade = 0.799981688894314
+    .PatternTintAndShade = 0
+End With
+Rng1(1).Select
+Application.EnableEvents = True
+End Sub
+
+Function ValFor(Cel)
+'判断单元格是否有数据验证
+On Error Resume Next
+a = Cel.Validation.Formula1
+b = False
+If Err.Number = 0 Then b = True
+Err.Clear
+On Error GoTo 0
+ValFor = b
+End Function
+
+Function Str1(Cel)
+'获取下拉列表
+
+'常用变量
+Dim St1, Col
+Set St1 = Sheets(St1Name)
+Col = St1.[a1].End(xlToRight).Column
+
+'获取当前行内容数组
+Dim Col2, Ind, StrArr(), BooArr()
+Col2 = Range(Rng1Address).Column
+Ind = Cel.Column - Col2 + 1
+StrArr() = Application.Transpose(Range(Cells(Cel.Row, Col2), Cells(Cel.Row, Col2 + Col - 1)).Value)
+
+'创建字典并赋值
+Dim d As Object
+Set d = CreateObject("Scripting.Dictionary")
+row1 = St1.[a1].End(xlDown).Row
+Dim arr()
+arr = St1.Range(St1.Cells(1, 1), St1.Cells(row1, Col)).Value
+For i = 2 To row1
+    '判断是否满足条件
+    boo = 0
+    For m = 1 To UBound(StrArr)
+    If m < Ind And StrArr(m, 1) <> Replace(arr(i, m), ",", "_") Then boo = boo + 1
+    Next
+    
+    '满足条件的才被计入字典
+    If St1.Cells(i, Ind).Value <> "" And boo = 0 Then
+        d(Replace(St1.Cells(i, Ind).Value, ",", "_")) = ""
+    End If
+Next
+arr = d.Keys
+Str1 = Join(arr, ",")
+
+End Function
+
+
